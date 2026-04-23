@@ -1,0 +1,25 @@
+{
+  "name": "news-bot",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "npx tsx src/main.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "nodemailer": "^8.0.5",
+    "openai": "^6.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/nodemailer": "^8.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}
