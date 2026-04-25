@@ -1,40 +1,49 @@
-import { GoogleGenAI } from "@google/genai";
 import type { Article } from "../NewsModule/NewsService";
 import { AI_PROMPT, buildUserPrompt } from "./utils/promptUtil";
 
-
 export type SummarizationResult = string;
 
-let aiClient: GoogleGenAI | null = null;
-
-function getAiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables. Please add it to .env.");
-    }
-    aiClient = new GoogleGenAI({ apiKey });
+async function callGeminiApi(prompt: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not set in environment variables.");
   }
-  return aiClient;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Gemini API error: ${res.status}`);
+  }
+
+  const data = await res.json() as any;
+  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
 export async function summarizeArticles(
   articles: Article[]
 ): Promise<SummarizationResult> {
-  const ai = getAiClient();
   const userPrompt = buildUserPrompt(articles);
-
   const fullPrompt = `${AI_PROMPT}\n\n${userPrompt}`;
-  
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-lite",
-    contents: fullPrompt,
-  });
 
-  const content = response.text;
+  const content = await callGeminiApi(fullPrompt);
 
   if (!content) {
-    throw new Error("Google GenAI returned an empty response.");
+    throw new Error("Gemini returned an empty response.");
   }
 
   return content.trim();
