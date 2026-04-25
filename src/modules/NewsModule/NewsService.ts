@@ -1,95 +1,72 @@
-// ─── News Module: NewsService.ts ────────────────────────────────────────────
-// Handles all GNews API calls for fetching latest news articles.
+import "dotenv/config";
+import { filterRecentNews } from "./utils/newsFilter";
 
 export interface Article {
   title: string;
   description: string;
-  url: string;
-  image: string;
-  publishedAt: string;
-  source: {
-    name: string;
-    url: string;
-  };
+  link: string;
+  pubDate: string;
 }
 
-interface GNewsResponse {
-  totalArticles: number;
-  articles: Article[];
-}
+const NEWSDATA_BASE_URL = "https://newsdata.io/api/1/news";
 
-const GNEWS_BASE_URL = "https://gnews.io/api/v4";
-
-/**
- * Fetches top headlines from GNews by category.
- * Uses the Top Headlines endpoint.
- */
-export async function fetchTopHeadlines(
-  category: string,
-  maxArticles: number = 5
-): Promise<Article[]> {
-  const apiKey = process.env.GNEWS_API_KEY;
+async function fetchFromNewsdata(endpointParams: string): Promise<Article[]> {
+  const apiKey = process.env.NEWSDATA_API_KEY;
   if (!apiKey) {
-    throw new Error("GNEWS_API_KEY is not set in environment variables.");
+    throw new Error("NEWSDATA_API_KEY is not set in environment variables.");
   }
 
-  const url = `${GNEWS_BASE_URL}/top-headlines?category=${encodeURIComponent(category)}&lang=en&max=${maxArticles}&apikey=${apiKey}`;
-
+  const url = `${NEWSDATA_BASE_URL}?apikey=${apiKey}&${endpointParams}`;
   const response = await fetch(url);
 
-  if (!response.ok) {
-    throw new Error(
-      `GNews API error (top-headlines/${category}): ${response.status} ${response.statusText}`
-    );
+  if (response.status === 429) {
+    console.warn("⚠️ Rate limit reached (429). Retrying after 2 seconds...");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    return fetchFromNewsdata(endpointParams);
   }
-
-  const data = (await response.json()) as GNewsResponse;
-  return data.articles || [];
-}
-
-/**
- * Fetches articles from GNews by search query.
- * Uses the Search endpoint — ideal for topics like "movies" that don't have a direct category.
- */
-export async function fetchSearchNews(
-  query: string,
-  maxArticles: number = 5
-): Promise<Article[]> {
-  const apiKey = process.env.GNEWS_API_KEY;
-  if (!apiKey) {
-    throw new Error("GNEWS_API_KEY is not set in environment variables.");
-  }
-
-  const url = `${GNEWS_BASE_URL}/search?q=${encodeURIComponent(query)}&lang=en&max=${maxArticles}&sortby=publishedAt&apikey=${apiKey}`;
-
-  const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(
-      `GNews API error (search/${query}): ${response.status} ${response.statusText}`
-    );
+    throw new Error(`Newsdata API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = (await response.json()) as GNewsResponse;
-  return data.articles || [];
+  const data = (await response.json()) as any;
+  const results = data.results || [];
+
+  const mappedResults = results.map((item: any) => ({
+    title: item.title || "",
+    description: item.description || "",
+    link: item.link || "",
+    pubDate: item.pubDate || "",
+  }));
+
+  const filteredResults = filterRecentNews(mappedResults);
+
+  return filteredResults.slice(0, 10);
 }
 
-/**
- * Fetches all news across the 3 categories in parallel.
- * - Movies: Search endpoint with q="movies"
- * - Share Market: Top Headlines with category="business"
- * - Technology: Top Headlines with category="technology"
- */
-export async function fetchAllNews(): Promise<{
-  movies: Article[];
-  shareMarket: Article[];
-  technology: Article[];
-}> {
-  const [movies, shareMarket, technology] = await Promise.all([
-    fetchSearchNews("movies"),
-    fetchTopHeadlines("business"),
-    fetchTopHeadlines("technology"),
-  ]);
+export async function fetchTechNews(): Promise<Article[]> {
+  // Global tech news focusing on AI / Startups
+  return fetchFromNewsdata("category=technology&language=en&q=AI%20OR%20startups");
+}
 
-  return { movies, shareMarket, technology };
+export async function fetchSportsNews(): Promise<Article[]> {
+  // India sports news focusing on IPL / cricket
+  return fetchFromNewsdata("category=sports&country=in&language=en&q=IPL%20OR%20cricket");
+}
+
+export async function fetchAllNews(categoryParams?: string): Promise<Article[]> {
+  if (categoryParams === "technology") {
+    return fetchTechNews();
+  }
+
+  if (categoryParams === "sports") {
+    return fetchSportsNews();
+  }
+
+  const techNews = await fetchTechNews();
+  // Delay between requests to prevent rapid rate limit triggering on free accounts
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const sportsNews = await fetchSportsNews();
+
+  return [...techNews, ...sportsNews];
 }

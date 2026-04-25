@@ -1,21 +1,13 @@
-// ─── Email Module: EmailController.ts ───────────────────────────────────────
-// Controller wrapper for email operations.
-
-import { sendEmail, buildEmailHtml, buildGreeting } from "./EmailService";
+import { sendEmail } from "./EmailService";
+import { generateEmailHTML, buildGreeting } from "./utils/formatUtil";
 import type { SummarizationResult } from "../AIModule/AiService";
 
-/**
- * Orchestrates building and sending the news email.
- * Returns the greeting used in the email.
- */
 export async function sendNewsEmail(
   recipientEmail: string,
   summary: SummarizationResult
-): Promise < string > {
-  console.log(`📧 Sending news email to: ${recipientEmail}...`);
-
+): Promise<string> {
   const greeting = buildGreeting();
-  const htmlBody = buildEmailHtml(greeting, summary);
+  const htmlBody = generateEmailHTML(greeting, summary);
 
   const today = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -26,8 +18,6 @@ export async function sendNewsEmail(
   const subject = `📰 Your Daily News — ${today}`;
 
   await sendEmail(recipientEmail, subject, htmlBody);
-
-  console.log(`  ✅ Email sent successfully!`);
 
   return greeting;
 }

@@ -1,6 +1,3 @@
-// ─── BotService.ts ──────────────────────────────────────────────────────────
-// Main orchestrator: Fetch News → Summarize with AI → Send Email.
-
 import { getAllNews } from "./modules/NewsModule/NewsController";
 import { summarizeNews } from "./modules/AIModule/AiController";
 import { sendNewsEmail } from "./modules/EmailModule/EmailController";
@@ -14,19 +11,11 @@ export interface BotResponse {
   sentTo: string;
 }
 
-/**
- * Handles the complete news pipeline.
- * 1. Fetch latest news from GNews (3 categories in parallel)
- * 2. Summarize with OpenAI (5 bullet points per category)
- * 3. Send formatted email to recipient
- *
- * @param recipientEmail - Email to send   to (optional, falls back to DEFAULT_EMAIL)
- */
 export async function handleBotRequest(
-  recipientEmail?: string
+  recipientEmail?: string,
+  categoryParams?: string
 ): Promise<BotResponse> {
-  const targetEmail =
-    recipientEmail || process.env.DEFAULT_EMAIL;
+  const targetEmail = recipientEmail || process.env.DEFAULT_EMAIL;
 
   if (!targetEmail) {
     return {
@@ -39,22 +28,25 @@ export async function handleBotRequest(
     };
   }
 
-  console.log("\n════════════════════════════════════════════");
-  console.log("🚀 News Bot — Starting pipeline...");
-  console.log("════════════════════════════════════════════\n");
-
   // Step 1: Fetch news
-  const newsData = await getAllNews();
+  const newsData = await getAllNews(categoryParams);
 
   // Step 2: Summarize with AI
-  const summary = await summarizeNews(newsData);
+  const summary = await summarizeNews(newsData.topNews);
 
-  // Step 3: Send email
+  // Step 3: Check Importance Filter
+  if (summary.includes("NO_IMPORTANT_NEWS")) {
+    return {
+      success: true,
+      message: "No important news today",
+      greeting: "",
+      summary: summary,
+      sentTo: targetEmail,
+    };
+  }
+
+  // Step 4: Send email
   const greeting = await sendNewsEmail(targetEmail, summary);
-
-  console.log("\n════════════════════════════════════════════");
-  console.log("✅ Pipeline complete!");
-  console.log("════════════════════════════════════════════\n");
 
   return {
     success: true,
