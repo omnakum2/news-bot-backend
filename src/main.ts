@@ -2,11 +2,14 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { handleBotRequest } from "./BotService";
+import { sendInvoiceEmail } from "./modules/EmailModule/EmailController";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+  origin: "*"
+}));
 app.use(express.json());
 
 app.get("/api/get-daily-news", async (req: Request, res: Response) => {
@@ -29,6 +32,24 @@ app.get("/api/get-daily-news", async (req: Request, res: Response) => {
       greeting: "",
       summary: null,
       sentTo: "",
+    });
+  }
+});
+
+app.post("/api/send-invoice", async (req: Request, res: Response) => {
+  try {
+    const { recipientEmail, subject, htmlBody, attachments } = req.body;
+    await sendInvoiceEmail({recipientEmail, subject, htmlBody, attachments});
+    res.status(200).json({ success: true, message: "Email sent successfully" });
+  } catch (error: unknown) {
+    console.error("❌ Email service error:", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
+    res.status(500).json({
+      success: false,
+      message: `Internal server error: ${errorMessage}`,
     });
   }
 });

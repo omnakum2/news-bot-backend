@@ -1,6 +1,13 @@
-import { sendEmail } from "./EmailService";
+import { EmailAttachment, sendEmail } from "./EmailService";
 import { generateEmailHTML, buildGreeting } from "./utils/formatUtil";
 import type { SummarizationResult } from "../AIModule/AiService";
+
+export interface SendMailRequest {
+  recipientEmail: string;
+  subject: string;
+  htmlBody: string;
+  attachments?: EmailAttachment[];
+}
 
 export async function sendNewsEmail(
   recipientEmail: string,
@@ -20,4 +27,10 @@ export async function sendNewsEmail(
   await sendEmail(recipientEmail, subject, htmlBody);
 
   return greeting;
+}
+
+export async function sendInvoiceEmail(
+  request: SendMailRequest
+): Promise<void> {
+  await sendEmail(request.recipientEmail, request.subject, request.htmlBody, request.attachments);
 }
